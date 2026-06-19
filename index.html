@@ -120,6 +120,8 @@
   .habit-extra{width:52px;text-align:center;border:1px solid #e3ddd0;border-radius:7px;background:#faf8f2;padding:5px;font:500 13px 'Hanken Grotesk';color:var(--ink);outline:none}
   .habit-extra.topic{width:118px;text-align:left;padding:5px 9px;font-weight:400}
   .habit-extra:focus{border-color:var(--purple);background:#fff}
+  .habit-topic{flex:1;min-width:140px;border:1px solid #e3ddd0;border-radius:8px;background:#faf8f2;padding:6px 10px;font:400 13px/1.5 'Hanken Grotesk';color:var(--ink);outline:none;resize:none;field-sizing:content;min-height:30px}
+  .habit-topic:focus{border-color:var(--purple);background:#fff}
   .extra-unit{font:400 12px 'Hanken Grotesk';color:var(--faint);margin-left:-3px}
   .hc-group{display:flex;gap:6px;flex:none}
   .hc-btn{border-radius:20px;padding:5px 14px;font:600 13px 'Hanken Grotesk';cursor:pointer;transition:all .14s;border:1px solid #e3ddd0;background:#faf8f2;color:#8a8492}
@@ -354,8 +356,8 @@
           <div class="hc-group"><button class="hc-btn" data-habit="leer" data-val="si" onclick="toggleHabit(this)">Sí</button><button class="hc-btn" data-habit="leer" data-val="no" onclick="toggleHabit(this)">No</button></div>
         </div>
         <div class="habit-row">
-          <span class="habit-bar"></span><div class="habit-name">Aprendí algo nuevo</div>
-          <input class="habit-extra topic" id="h_tema" placeholder="¿Qué tema?" oninput="updateProgress()">
+          <span class="habit-bar"></span><div class="habit-name" style="flex:none">Aprendí algo nuevo</div>
+          <textarea class="habit-topic" id="h_tema" rows="1" placeholder="¿Qué aprendiste?" oninput="updateProgress()"></textarea>
           <div class="hc-group"><button class="hc-btn" data-habit="aprendizaje" data-val="si" onclick="toggleHabit(this)">Sí</button><button class="hc-btn" data-habit="aprendizaje" data-val="no" onclick="toggleHabit(this)">No</button></div>
         </div>
         <div class="habit-row">
@@ -675,15 +677,26 @@ document.getElementById('intencion').addEventListener('input',updateProgress);
 /* ---------- SUPABASE CRUD ---------- */
 async function loadEntry(){
   const {data,error}=await sb.from('bitacora').select('*').eq('user_id',currentUser.id).eq('date',currentDate).single();
-  if(error && error.code!=='PGRST116'){ console.error(error); }
+  if(error && error.code!=='PGRST116'){ console.error('Error Supabase al cargar:',error); setSaveError('No se pudo cargar: '+(error.message||'')); }
   populateData(data||null);
 }
 async function saveEntry(){
   setStatus('Guardando…',false);
-  const {error}=await sb.from('bitacora').upsert(collectData(),{onConflict:'user_id,date'});
-  if(error){ setStatus('Error al guardar',false); console.error(error); return; }
-  setStatus('Guardado ✓',true);
-  loadHistory();
+  let payload;
+  try{ payload=collectData(); }catch(e){ setSaveError('No se pudo leer el formulario: '+e.message); return; }
+  try{
+    const {error}=await sb.from('bitacora').upsert(payload,{onConflict:'user_id,date'});
+    if(error){
+      console.error('Error Supabase al guardar:',error);
+      setSaveError(error.message || error.hint || 'Error al guardar');
+      return;
+    }
+    setStatus('Guardado ✓',true);
+    loadHistory();
+  }catch(e){
+    console.error('Excepción al guardar:',e);
+    setSaveError(e.message || 'Error de conexión');
+  }
 }
 async function loadHistory(){
   const {data}=await sb.from('bitacora').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}).limit(40);
@@ -716,7 +729,8 @@ function entryPct(e){
   return Math.round(n/total*100);
 }
 
-function setStatus(msg,ok){ saveStatusText.textContent=msg; saveStatus.className='save-status'+(ok?' saved':''); }
+function setStatus(msg,ok){ saveStatusText.textContent=msg; saveStatus.className='save-status'+(ok?' saved':''); saveStatus.style.color=''; saveStatusText.style.color=''; saveStatus.querySelector('.save-dot').style.background=''; }
+function setSaveError(msg){ saveStatusText.textContent='⚠ '+msg; saveStatus.className='save-status'; saveStatus.style.color='#993C1D'; saveStatusText.style.color='#993C1D'; saveStatus.querySelector('.save-dot').style.background='#F0997B'; }
 function toggleHistory(){ const open=historyPanel.style.display==='block'; historyPanel.style.display=open?'none':'block'; historyOverlay.style.display=open?'none':'block'; }
 </script>
 </body>
