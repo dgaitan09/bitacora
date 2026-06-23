@@ -142,7 +142,7 @@
   .insight-arrow{color:var(--purple);font:600 16px 'Hanken Grotesk';flex:none}
   .insight-input{flex:1;border:none;background:transparent;font:400 15px 'Hanken Grotesk';color:var(--ink);outline:none}
 
-  .textarea-field{width:100%;border:1px solid var(--line);border-radius:12px;background:#faf8f2;padding:13px 15px;font:400 14px/1.6 'Hanken Grotesk';color:var(--ink);outline:none;resize:vertical;min-height:96px;transition:all .15s}
+  .textarea-field{width:100%;border:1px solid var(--line);border-radius:12px;background:#faf8f2;padding:13px 15px;font:400 14px/1.6 'Hanken Grotesk';color:var(--ink);outline:none;resize:none;min-height:96px;transition:all .15s}
   .textarea-field:focus{border-color:var(--purple);background:#fff}
 
   /* CIERRE */
@@ -154,7 +154,7 @@
   .mood-btn.active{border-color:var(--purple);background:var(--purple);color:#fff;font-weight:600}
   .gratitud-input{width:100%;border:none;border-bottom:1.5px solid var(--purple-tint);background:transparent;padding:8px 0;font:italic 400 18px 'Newsreader';color:#3a3640;outline:none}
   .gratitud-input:focus{border-color:var(--purple)}
-  .nota-field{width:100%;border:1px solid var(--purple-tint);border-radius:12px;background:rgba(255,255,255,.6);padding:13px 15px;font:400 14px/1.7 'Hanken Grotesk';color:var(--ink);outline:none;resize:vertical;min-height:72px}
+  .nota-field{width:100%;border:1px solid var(--purple-tint);border-radius:12px;background:rgba(255,255,255,.6);padding:13px 15px;font:400 14px/1.7 'Hanken Grotesk';color:var(--ink);outline:none;resize:none;min-height:72px}
   .nota-field:focus{border-color:var(--purple);background:#fff}
 
   /* SAVE BAR */
@@ -434,6 +434,8 @@
           <input class="gratitud-input" id="gratitud" placeholder="Gratitud del día…" oninput="updateProgress()">
         </div>
       </div>
+      <div class="mini-lbl">Preocupaciones — lo que te tiene pensativo</div>
+      <textarea class="nota-field" id="preocupaciones" placeholder="¿Qué te preocupa o no te deja tranquilo hoy?" oninput="updateProgress()" style="margin-bottom:18px"></textarea>
       <div class="mini-lbl">Nota libre de cierre</div>
       <textarea class="nota-field" id="notaLibre" placeholder="Reflexión, idea que surgió, algo personal…" oninput="updateProgress()"></textarea>
     </div>
@@ -533,8 +535,8 @@ function updateDateDisplay(){
   const rel = dd===0?'HOY':dd===-1?'AYER':dd===1?'MAÑANA':(dd<0?Math.abs(dd)+' DÍAS ATRÁS':'EN '+dd+' DÍAS');
   dayRel.textContent = cap(fmt(currentDate,{weekday:'long'})).toUpperCase()+' · '+rel;
 }
-function changeDay(delta){ const d=new Date(currentDate+'T12:00:00'); d.setDate(d.getDate()+delta); currentDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); updateDateDisplay(); loadEntry(); }
-function goToday(){ currentDate=todayStr(); updateDateDisplay(); loadEntry(); }
+async function changeDay(delta){ await flushPendingSave(); const d=new Date(currentDate+'T12:00:00'); d.setDate(d.getDate()+delta); currentDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); updateDateDisplay(); loadEntry(); }
+async function goToday(){ await flushPendingSave(); currentDate=todayStr(); updateDateDisplay(); loadEntry(); }
 
 /* ---------- UI INTERACTIONS ---------- */
 function setEnergy(idx){ energyVal = (energyVal===idx)?null:idx; document.querySelectorAll('.edot').forEach(d=>d.classList.toggle('active', +d.dataset.e===energyVal)); updateProgress(); }
@@ -561,7 +563,7 @@ function addTask(text,done){
   if(text===undefined) row.querySelector('.task-text').focus();
   updateProgress();
 }
-function toggleTaskCb(btn){ const on=!btn.classList.contains('done'); btn.classList.toggle('done',on); btn.textContent=on?'✓':''; btn.parentElement.querySelector('.task-text').classList.toggle('done',on); }
+function toggleTaskCb(btn){ const on=!btn.classList.contains('done'); btn.classList.toggle('done',on); btn.textContent=on?'✓':''; btn.parentElement.querySelector('.task-text').classList.toggle('done',on); updateProgress(); }
 function addBullet(listId,amber,text){
   const list=document.getElementById(listId), btn=list.querySelector('.add-btn');
   const row=document.createElement('div'); row.className='bullet-row';
@@ -600,7 +602,7 @@ function collectData(){
     lo_que_hice:did, lo_que_falto:miss,
     insight1:insight1.value, insight2:insight2.value, insight3:insight3.value,
     obstaculos:obstaculos.value, proximos:proximos.value,
-    mood:moodVal, gratitud:gratitud.value, nota_libre:notaLibre.value,
+    mood:moodVal, gratitud:gratitud.value, nota_libre:notaLibre.value, preocupaciones:preocupaciones.value,
     habitos_custom:custom,
   };
 }
@@ -614,11 +616,12 @@ function clearForm(){
   for(let i=0;i<3;i++) addBullet('didList',false,'');
   missList.querySelectorAll('.bullet-row').forEach(r=>r.remove());
   for(let i=0;i<2;i++) addBullet('missList',true,'');
-  ['insight1','insight2','insight3','obstaculos','proximos','gratitud','notaLibre'].forEach(id=>document.getElementById(id).value='');
+  ['insight1','insight2','insight3','obstaculos','proximos','gratitud','notaLibre','preocupaciones'].forEach(id=>document.getElementById(id).value='');
   moodVal=''; document.querySelectorAll('#moodRow .mood-btn').forEach(b=>b.classList.remove('active'));
   updateProgress();
 }
 function populateData(data){
+  isInitialLoad=true;
   if(!data){ clearForm(); setStatus('Nueva entrada',false); return; }
   intencion.value=data.intencion||'';
   energyVal=(data.energia===0||data.energia)?data.energia:null;
@@ -643,14 +646,15 @@ function populateData(data){
 
   insight1.value=data.insight1||''; insight2.value=data.insight2||''; insight3.value=data.insight3||'';
   obstaculos.value=data.obstaculos||''; proximos.value=data.proximos||'';
-  gratitud.value=data.gratitud||''; notaLibre.value=data.nota_libre||'';
+  gratitud.value=data.gratitud||''; notaLibre.value=data.nota_libre||''; preocupaciones.value=data.preocupaciones||'';
   moodVal=data.mood||''; document.querySelectorAll('#moodRow .mood-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===moodVal));
+  isInitialLoad=false;
   updateProgress(); setStatus('Cargado',true);
 }
 
 /* ---------- PROGRESS ---------- */
 function updateProgress(){
-  let n=0; const total=12;
+  let n=0; const total=13;
   if(intencion.value.trim())n++;
   if(energyVal!=null)n++;
   if([...document.querySelectorAll('#taskList .task-text')].some(i=>i.value.trim()))n++;
@@ -663,6 +667,7 @@ function updateProgress(){
   if(moodVal)n++;
   if(gratitud.value.trim())n++;
   if(notaLibre.value.trim())n++;
+  if(preocupaciones.value.trim())n++;
   const pct=Math.round(n/total*100);
   pctLabel.textContent=pct+'%';
   ringProg.style.strokeDashoffset=(113.097*(1-pct/100)).toFixed(1);
@@ -670,9 +675,46 @@ function updateProgress(){
   const tot=[...document.querySelectorAll('#taskList .task-text')].filter(i=>i.value.trim()).length;
   const done=[...document.querySelectorAll('#taskList .task-row')].filter(r=>r.querySelector('.task-text').value.trim()&&r.querySelector('.task-cb').classList.contains('done')).length;
   tasksCount.textContent = tot? (done+'/'+tot+' hechas'):'';
-  if(saveStatusText.textContent!=='Guardando…') setStatus(n>0?'Sin guardar cambios':'Sin guardar',false);
+  if(saveStatusText.textContent!=='Guardando…' && saveStatusText.textContent!=='Guardado automático ✓') setStatus(n>0?'Sin guardar cambios':'Sin guardar',false);
+  scheduleAutosave();
 }
 document.getElementById('intencion').addEventListener('input',updateProgress);
+
+/* ---------- AUTOGUARDADO ---------- */
+let autosaveTimer=null;
+let hasUnsavedChanges=false;
+let isInitialLoad=true;
+
+function scheduleAutosave(){
+  if(isInitialLoad) return;
+  hasUnsavedChanges=true;
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(()=>{ if(hasUnsavedChanges) silentSave(); }, 1500);
+}
+
+async function silentSave(){
+  if(!currentUser) return;
+  setStatus('Guardando…',false);
+  let payload;
+  try{ payload=collectData(); }catch(e){ setSaveError('No se pudo leer el formulario: '+e.message); return; }
+  try{
+    const {error}=await sb.from('bitacora').upsert(payload,{onConflict:'user_id,date'});
+    if(error){ console.error('Error Supabase al guardar:',error); setSaveError(error.message||error.hint||'Error al guardar'); return; }
+    hasUnsavedChanges=false;
+    setStatus('Guardado automático ✓',true);
+    loadHistory();
+  }catch(e){
+    console.error('Excepción al guardar:',e);
+    setSaveError(e.message||'Error de conexión');
+  }
+}
+
+async function flushPendingSave(){
+  clearTimeout(autosaveTimer);
+  if(hasUnsavedChanges) await silentSave();
+}
+
+window.addEventListener('beforeunload',()=>{ if(hasUnsavedChanges) silentSave(); });
 
 /* ---------- SUPABASE CRUD ---------- */
 async function loadEntry(){
@@ -708,12 +750,12 @@ async function loadHistory(){
     const it=document.createElement('button'); it.className='hist-item'+(ent.date===currentDate?' active':'');
     it.innerHTML='<div class="hist-top"><span class="hist-date">'+cap(fmt(ent.date,{weekday:'short',day:'numeric',month:'short'}))+'</span><span class="hist-pct">'+pct+'%</span></div>'+
       '<div class="hist-snip">'+escHtml(ent.intencion||'Sin intención registrada')+'</div>';
-    it.onclick=()=>{ currentDate=ent.date; updateDateDisplay(); loadEntry(); toggleHistory(); };
+    it.onclick=async()=>{ await flushPendingSave(); currentDate=ent.date; updateDateDisplay(); loadEntry(); toggleHistory(); };
     list.appendChild(it);
   });
 }
 function entryPct(e){
-  let n=0; const total=12;
+  let n=0; const total=13;
   if((e.intencion||'').trim())n++;
   if(e.energia!=null)n++;
   if((e.tareas||[]).some(t=>t.text&&t.text.trim()))n++;
@@ -726,6 +768,7 @@ function entryPct(e){
   if(e.mood)n++;
   if((e.gratitud||'').trim())n++;
   if((e.nota_libre||'').trim())n++;
+  if((e.preocupaciones||'').trim())n++;
   return Math.round(n/total*100);
 }
 
