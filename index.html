@@ -140,7 +140,7 @@
   .insight-list{padding:6px 20px}
   .insight-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f1ece1}
   .insight-arrow{color:var(--purple);font:600 16px 'Hanken Grotesk';flex:none}
-  .insight-input{flex:1;border:none;background:transparent;font:400 15px 'Hanken Grotesk';color:var(--ink);outline:none}
+  .insight-input{flex:1;border:none;background:transparent;font:400 15px/1.5 'Hanken Grotesk';color:var(--ink);outline:none;resize:none;field-sizing:content;min-height:24px}
 
   .textarea-field{width:100%;border:1px solid var(--line);border-radius:12px;background:#faf8f2;padding:13px 15px;font:400 14px/1.6 'Hanken Grotesk';color:var(--ink);outline:none;resize:none;min-height:96px;transition:all .15s}
   .textarea-field:focus{border-color:var(--purple);background:#fff}
@@ -397,9 +397,9 @@
     <div class="section">
       <div class="eyebrow" style="margin-bottom:12px">Insights y decisiones</div>
       <div class="card insight-list">
-        <div class="insight-row"><span class="insight-arrow">→</span><input class="insight-input" id="insight1" placeholder="Una cosa que aprendí hoy…" oninput="updateProgress()"></div>
-        <div class="insight-row"><span class="insight-arrow">→</span><input class="insight-input" id="insight2" placeholder="Una decisión importante que tomé…" oninput="updateProgress()"></div>
-        <div class="insight-row" style="border-bottom:none"><span class="insight-arrow">→</span><input class="insight-input" id="insight3" placeholder="Algo que haría diferente…" oninput="updateProgress()"></div>
+        <div class="insight-row"><span class="insight-arrow">→</span><textarea class="insight-input" id="insight1" rows="1" placeholder="Una cosa que aprendí hoy…" oninput="updateProgress()"></textarea></div>
+        <div class="insight-row"><span class="insight-arrow">→</span><textarea class="insight-input" id="insight2" rows="1" placeholder="Una decisión importante que tomé…" oninput="updateProgress()"></textarea></div>
+        <div class="insight-row" style="border-bottom:none"><span class="insight-arrow">→</span><textarea class="insight-input" id="insight3" rows="1" placeholder="Algo que haría diferente…" oninput="updateProgress()"></textarea></div>
       </div>
     </div>
 
