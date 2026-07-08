@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#efebe1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Bitácora Gerencial</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,6 +25,8 @@
   input::placeholder,textarea::placeholder{color:#a7a1b0}
   textarea{field-sizing:content}
   input[type=number]::-webkit-inner-spin-button{opacity:.4}
+  :focus-visible{outline:2px solid var(--purple);outline-offset:2px;border-radius:4px}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
   .serif{font-family:'Newsreader',serif}
   .eyebrow{font:500 11px 'Hanken Grotesk';letter-spacing:.14em;text-transform:uppercase;color:var(--purple)}
 
@@ -64,6 +69,10 @@
   .ring-chip{display:flex;align-items:center;gap:9px;padding:5px 12px 5px 7px;background:var(--card);border:1px solid #e7e1d4;border-radius:30px}
   .ring-chip .pct{font:600 14px 'Hanken Grotesk';color:var(--ink);line-height:1.05}
   .ring-chip .lbl{font:500 10px 'Hanken Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .streak-chip{display:none;align-items:center;gap:8px;padding:5px 12px 5px 10px;background:var(--card);border:1px solid #e7e1d4;border-radius:30px}
+  .streak-chip .fire{font-size:15px;line-height:1}
+  .mini-link{border:none;background:none;color:var(--purple);cursor:pointer;font:600 12px 'Hanken Grotesk';padding:0}
+  .mini-link:hover{color:var(--purple-d);text-decoration:underline}
   .btn-ghost{border:1px solid #e0d9cb;background:var(--card);border-radius:8px;padding:8px 13px;font:500 13px 'Hanken Grotesk';color:#55505c;cursor:pointer;transition:all .12s}
   .btn-ghost:hover{border-color:#bdb4ec;color:var(--purple)}
 
@@ -158,7 +167,7 @@
   .nota-field:focus{border-color:var(--purple);background:#fff}
 
   /* SAVE BAR */
-  .save-bar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid #e3ddd0;border-radius:30px;padding:9px 10px 9px 20px;box-shadow:0 10px 34px -10px rgba(40,30,80,.3)}
+  .save-bar{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid #e3ddd0;border-radius:30px;padding:9px 10px 9px 20px;box-shadow:0 10px 34px -10px rgba(40,30,80,.3)}
   .save-status{display:flex;align-items:center;gap:8px;font:500 13px 'Hanken Grotesk';color:var(--muted)}
   .save-dot{width:8px;height:8px;border-radius:50%;background:#d4cdde}
   .save-status.saved{color:var(--green)}
@@ -204,6 +213,7 @@
     .auth-head{font-size:34px}
     .two-col,.cierre-grid{grid-template-columns:1fr}
     .habit-extra.topic{width:90px}
+    .streak-chip{display:none!important}
   }
 </style>
 </head>
@@ -239,7 +249,7 @@
           <input class="field-input" type="password" id="loginPassword" placeholder="••••••••">
           <button type="button" class="pass-toggle" onclick="togglePass('loginPassword',this)">Ver</button>
         </div>
-        <button class="btn-primary" onclick="login()">Entrar</button>
+        <button class="btn-primary" id="loginBtn" onclick="login()">Entrar</button>
         <div class="auth-err" id="loginErr"></div>
         <div class="auth-switch">¿No tienes cuenta? <a onclick="showRegister()">Regístrate</a></div>
       </div>
@@ -261,7 +271,7 @@
           <input class="field-input" type="password" id="regPasswordConfirm" placeholder="Repite tu contraseña">
           <button type="button" class="pass-toggle" onclick="togglePass('regPasswordConfirm',this)">Ver</button>
         </div>
-        <button class="btn-primary" onclick="register()">Crear cuenta</button>
+        <button class="btn-primary" id="regBtn" onclick="register()">Crear cuenta</button>
         <div class="auth-err" id="regErr"></div>
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="showLogin()">Inicia sesión</a></div>
       </div>
@@ -275,6 +285,10 @@
     <div class="topbar-in">
       <div class="brand"><div class="brand-mark">B</div><div class="brand-name">Bitácora</div></div>
       <div class="header-right">
+        <div class="streak-chip" id="streakChip" title="Días consecutivos con entrada">
+          <span class="fire">🔥</span>
+          <div><div class="pct" id="streakNum">0</div><div class="lbl">racha</div></div>
+        </div>
         <div class="ring-chip">
           <svg width="34" height="34" viewBox="0 0 44 44" style="transform:rotate(-90deg)">
             <circle cx="22" cy="22" r="18" fill="none" stroke="#ece6da" stroke-width="4"></circle>
@@ -328,7 +342,7 @@
 
     <!-- TAREAS -->
     <div class="section">
-      <div class="sec-title-row"><span class="eyebrow">Tareas del día</span><span class="sec-count" id="tasksCount"></span></div>
+      <div class="sec-title-row"><span class="eyebrow">Tareas del día</span><span style="display:flex;gap:14px;align-items:baseline"><button class="mini-link" onclick="importYesterday()">↩ Traer pendientes de ayer</button><span class="sec-count" id="tasksCount"></span></span></div>
       <div class="card task-list" id="taskList">
         <button class="add-btn" onclick="addTask()">+ Agregar tarea</button>
       </div>
@@ -462,7 +476,9 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
+let currentSession = null;
 let currentDate = todayStr();
+let loadToken = 0; // evita que cargas viejas pisen la vista actual
 let energyVal = null;
 let moodVal = '';
 let habits = {};
@@ -471,7 +487,20 @@ let customHabitCount = 0;
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmt(s,opts){ return new Date(s+'T12:00:00').toLocaleDateString('es-ES',opts); }
 function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
-function escHtml(str){ return (str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function escHtml(str){ return (str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function trAuthErr(msg){
+  const map={
+    'Invalid login credentials':'Correo o contraseña incorrectos.',
+    'Email not confirmed':'Debes confirmar tu correo antes de entrar. Revisa tu bandeja.',
+    'User already registered':'Ya existe una cuenta con este correo.',
+    'Password should be at least 6 characters':'La contraseña debe tener mínimo 6 caracteres.',
+    'Unable to validate email address: invalid format':'El correo no tiene un formato válido.',
+    'Email rate limit exceeded':'Demasiados intentos. Espera unos minutos.',
+    'For security purposes, you can only request this after':'Por seguridad, espera unos segundos e inténtalo de nuevo.'
+  };
+  for(const k in map){ if((msg||'').includes(k)) return map[k]; }
+  return msg||'Ocurrió un error. Intenta de nuevo.';
+}
 
 /* ---------- AUTH ---------- */
 function showRegister(){ loginForm.style.display='none'; registerForm.style.display='block'; }
@@ -479,21 +508,43 @@ function showLogin(){ registerForm.style.display='none'; loginForm.style.display
 function togglePass(id,btn){ const i=document.getElementById(id); const h=i.type==='password'; i.type=h?'text':'password'; btn.textContent=h?'Ocultar':'Ver'; }
 function showErr(id,msg,ok){ const el=document.getElementById(id); el.style.display='block'; el.style.background=ok?'#EAF3DE':''; el.style.color=ok?'#3B6D11':''; el.textContent=msg; }
 
+function lockBtn(btn,lock,txt){ if(!btn)return; btn.disabled=lock; btn.style.opacity=lock?'.6':''; btn.style.cursor=lock?'wait':''; if(txt)btn.textContent=txt; }
 async function login(){
-  const email=loginEmail.value, pass=loginPassword.value;
-  const {error}=await sb.auth.signInWithPassword({email,password:pass});
-  if(error) showErr('loginErr', error.message);
+  const btn=document.getElementById('loginBtn');
+  const email=loginEmail.value.trim(), pass=loginPassword.value;
+  if(!email||!pass){ showErr('loginErr','Ingresa tu correo y contraseña.'); return; }
+  lockBtn(btn,true,'Entrando…');
+  try{
+    const {error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error) showErr('loginErr', trAuthErr(error.message));
+  }catch(e){ showErr('loginErr','Sin conexión. Verifica tu internet.'); }
+  finally{ lockBtn(btn,false,'Entrar'); }
 }
 async function register(){
-  const name=regName.value, email=regEmail.value, pass=regPassword.value, confirm=regPasswordConfirm.value;
+  const btn=document.getElementById('regBtn');
+  const name=regName.value.trim(), email=regEmail.value.trim(), pass=regPassword.value, confirm=regPasswordConfirm.value;
+  if(!email){ showErr('regErr','Ingresa tu correo.'); return; }
   if(!pass){ showErr('regErr','Ingresa una contraseña.'); return; }
   if(pass.length<6){ showErr('regErr','La contraseña debe tener mínimo 6 caracteres.'); return; }
   if(pass!==confirm){ showErr('regErr','Las contraseñas no coinciden.'); return; }
-  const {error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
-  if(error) showErr('regErr', error.message);
-  else showErr('regErr','Revisa tu correo para confirmar tu cuenta.',true);
+  lockBtn(btn,true,'Creando…');
+  try{
+    const {error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+    if(error) showErr('regErr', trAuthErr(error.message));
+    else showErr('regErr','Revisa tu correo para confirmar tu cuenta.',true);
+  }catch(e){ showErr('regErr','Sin conexión. Verifica tu internet.'); }
+  finally{ lockBtn(btn,false,'Crear cuenta'); }
 }
-async function logout(){ clearTimeout(inactivityTimer); await sb.auth.signOut(); app.style.display='none'; authScreen.style.display='flex'; }
+async function logout(){
+  clearTimeout(inactivityTimer);
+  await flushPendingSave();               // no perder lo último escrito
+  await sb.auth.signOut();
+  currentUser=null; currentSession=null;
+  app.style.display='none'; authScreen.style.display='flex';
+}
+// Enter para enviar los formularios de acceso
+['loginEmail','loginPassword'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') login(); }));
+['regName','regEmail','regPassword','regPasswordConfirm'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') register(); }));
 
 /* ---------- CIERRE AUTOMÁTICO POR INACTIVIDAD ---------- */
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutos — cambia el 30 por los minutos que quieras
@@ -504,8 +555,9 @@ function resetInactivity(){
 }
 async function autoLogout(){
   clearTimeout(inactivityTimer);
+  await flushPendingSave();               // guardar lo pendiente antes de expirar
   await sb.auth.signOut();
-  currentUser = null;
+  currentUser = null; currentSession = null;
   app.style.display='none';
   authScreen.style.display='flex';
   showLogin();
@@ -516,6 +568,7 @@ async function autoLogout(){
 sb.auth.onAuthStateChange((event,session)=>{
   if(session){
     currentUser=session.user;
+    currentSession=session;
     authScreen.style.display='none';
     app.style.display='block';
     goToday();
@@ -622,7 +675,8 @@ function clearForm(){
 }
 function populateData(data){
   isInitialLoad=true;
-  if(!data){ clearForm(); setStatus('Nueva entrada',false); return; }
+  hasUnsavedChanges=false;
+  if(!data){ clearForm(); setStatus('Nueva entrada',false); isInitialLoad=false; return; }
   intencion.value=data.intencion||'';
   energyVal=(data.energia===0||data.energia)?data.energia:null;
   document.querySelectorAll('.edot').forEach(d=>d.classList.toggle('active',+d.dataset.e===energyVal));
@@ -714,11 +768,35 @@ async function flushPendingSave(){
   if(hasUnsavedChanges) await silentSave();
 }
 
-window.addEventListener('beforeunload',()=>{ if(hasUnsavedChanges) silentSave(); });
+/* Al cerrar pestaña, un fetch normal se cancela; keepalive garantiza que llegue */
+function keepaliveSave(){
+  if(!hasUnsavedChanges || !currentUser || !currentSession) return;
+  let payload; try{ payload=collectData(); }catch(e){ return; }
+  try{
+    fetch(SUPABASE_URL+'/rest/v1/bitacora?on_conflict=user_id,date',{
+      method:'POST', keepalive:true,
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_KEY,
+        'Authorization':'Bearer '+currentSession.access_token,
+        'Prefer':'resolution=merge-duplicates'
+      },
+      body:JSON.stringify(payload)
+    });
+    hasUnsavedChanges=false;
+  }catch(e){}
+}
+window.addEventListener('beforeunload',keepaliveSave);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){ keepaliveSave(); }
+  else if(currentUser){ updateDateDisplay(); } // si pasó medianoche, refresca "HOY/AYER"
+});
 
 /* ---------- SUPABASE CRUD ---------- */
 async function loadEntry(){
+  const myToken=++loadToken;
   const {data,error}=await sb.from('bitacora').select('*').eq('user_id',currentUser.id).eq('date',currentDate).single();
+  if(myToken!==loadToken) return; // llegó tarde: el usuario ya cambió de día
   if(error && error.code!=='PGRST116'){ console.error('Error Supabase al cargar:',error); setSaveError('No se pudo cargar: '+(error.message||'')); }
   populateData(data||null);
 }
@@ -740,8 +818,38 @@ async function saveEntry(){
     setSaveError(e.message || 'Error de conexión');
   }
 }
+/* Trae las tareas no completadas del día anterior al que estás viendo */
+async function importYesterday(){
+  if(!currentUser) return;
+  const d=new Date(currentDate+'T12:00:00'); d.setDate(d.getDate()-1);
+  const prev=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const {data,error}=await sb.from('bitacora').select('tareas').eq('user_id',currentUser.id).eq('date',prev).single();
+  if(error||!data||!(data.tareas||[]).length){ setStatus('No hay tareas pendientes de ayer',false); return; }
+  const existing=new Set([...document.querySelectorAll('#taskList .task-text')].map(i=>i.value.trim()).filter(Boolean));
+  const pending=(data.tareas||[]).filter(t=>t.text&&t.text.trim()&&!t.done&&!existing.has(t.text.trim()));
+  if(!pending.length){ setStatus('No hay tareas pendientes de ayer',false); return; }
+  // eliminar filas vacías antes de insertar
+  document.querySelectorAll('#taskList .task-row').forEach(r=>{ if(!r.querySelector('.task-text').value.trim()) r.remove(); });
+  pending.forEach(t=>addTask(t.text,false));
+  setStatus(pending.length+(pending.length===1?' tarea traída de ayer':' tareas traídas de ayer'),true);
+}
+
+/* Racha: días consecutivos con entrada, terminando hoy o ayer */
+function computeStreak(dates){
+  const set=new Set(dates);
+  let d=new Date(todayStr()+'T12:00:00');
+  const key=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  if(!set.has(key(d))) d.setDate(d.getDate()-1); // si hoy aún no escribes, cuenta desde ayer
+  let n=0;
+  while(set.has(key(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+
 async function loadHistory(){
   const {data}=await sb.from('bitacora').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}).limit(40);
+  const streak=computeStreak((data||[]).map(e=>e.date));
+  const chip=document.getElementById('streakChip');
+  if(streak>1){ chip.style.display='flex'; document.getElementById('streakNum').textContent=streak; } else { chip.style.display='none'; }
   const list=historyList; list.innerHTML='';
   if(!data||!data.length){ list.innerHTML='<div class="hist-empty">Aún no tienes entradas.<br>Empieza a escribir la de hoy.</div>'; histCount.textContent=''; return; }
   histCount.textContent = data.length+(data.length===1?' entrada':' entradas');
