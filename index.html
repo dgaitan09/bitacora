@@ -342,7 +342,7 @@
 
     <!-- TAREAS -->
     <div class="section">
-      <div class="sec-title-row"><span class="eyebrow">Tareas del día</span><span style="display:flex;gap:14px;align-items:baseline"><button class="mini-link" onclick="importYesterday()">↩ Traer pendientes de ayer</button><span class="sec-count" id="tasksCount"></span></span></div>
+      <div class="sec-title-row"><span class="eyebrow">Tareas del día</span><span style="display:flex;gap:14px;align-items:baseline"><button class="mini-link" id="importBtn" title="Trae todas las tareas que siguen abiertas en días anteriores" onclick="importPending()">↩ Traer pendientes</button><span class="sec-count" id="tasksCount"></span></span></div>
       <div class="card task-list" id="taskList">
         <button class="add-btn" onclick="addTask()">+ Agregar tarea</button>
       </div>
@@ -818,20 +818,52 @@ async function saveEntry(){
     setSaveError(e.message || 'Error de conexión');
   }
 }
-/* Trae las tareas no completadas del día anterior al que estás viendo */
-async function importYesterday(){
+/* Arrastra TODAS las tareas que siguen abiertas en días anteriores.
+   Regla clave: para cada tarea se mira su estado MÁS RECIENTE. Si en algún día
+   posterior quedó marcada como hecha, ya no se vuelve a traer. */
+const IMPORT_MAX_DAYS = 90;   // no arrastrar fósiles más viejos que esto
+function daysBetween(a,b){ return Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00'))/86400000); }
+
+async function importPending(){
   if(!currentUser) return;
-  const d=new Date(currentDate+'T12:00:00'); d.setDate(d.getDate()-1);
-  const prev=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  const {data,error}=await sb.from('bitacora').select('tareas').eq('user_id',currentUser.id).eq('date',prev).single();
-  if(error||!data||!(data.tareas||[]).length){ setStatus('No hay tareas pendientes de ayer',false); return; }
-  const existing=new Set([...document.querySelectorAll('#taskList .task-text')].map(i=>i.value.trim()).filter(Boolean));
-  const pending=(data.tareas||[]).filter(t=>t.text&&t.text.trim()&&!t.done&&!existing.has(t.text.trim()));
-  if(!pending.length){ setStatus('No hay tareas pendientes de ayer',false); return; }
-  // eliminar filas vacías antes de insertar
+  const btn=document.getElementById('importBtn');
+  const from=new Date(currentDate+'T12:00:00'); from.setDate(from.getDate()-IMPORT_MAX_DAYS);
+  const fromStr=from.getFullYear()+'-'+String(from.getMonth()+1).padStart(2,'0')+'-'+String(from.getDate()).padStart(2,'0');
+
+  lockBtn(btn,true,'Buscando…');
+  const {data,error}=await sb.from('bitacora')
+    .select('date,tareas')
+    .eq('user_id',currentUser.id)
+    .lt('date',currentDate)
+    .gte('date',fromStr)
+    .order('date',{ascending:false});   // del más reciente al más antiguo
+  lockBtn(btn,false,'↩ Traer pendientes');
+
+  if(error){ setSaveError('No se pudieron cargar los pendientes'); return; }
+
+  // Primera vez que aparece un texto = su estado más reciente. Eso manda.
+  const latest=new Map();
+  (data||[]).forEach(entry=>{
+    (entry.tareas||[]).forEach(t=>{
+      const key=(t.text||'').trim();
+      if(!key) return;
+      if(!latest.has(key)) latest.set(key,{text:key,done:!!t.done,date:entry.date});
+    });
+  });
+
+  const yaEnPantalla=new Set([...document.querySelectorAll('#taskList .task-text')].map(i=>i.value.trim()).filter(Boolean));
+  const pendientes=[...latest.values()]
+    .filter(t=>!t.done && !yaEnPantalla.has(t.text))
+    .sort((a,b)=>a.date.localeCompare(b.date));   // lo más viejo arriba: lo que más pesa
+
+  if(!pendientes.length){ setStatus('No tienes tareas pendientes por arrastrar',true); return; }
+
   document.querySelectorAll('#taskList .task-row').forEach(r=>{ if(!r.querySelector('.task-text').value.trim()) r.remove(); });
-  pending.forEach(t=>addTask(t.text,false));
-  setStatus(pending.length+(pending.length===1?' tarea traída de ayer':' tareas traídas de ayer'),true);
+  pendientes.forEach(t=>addTask(t.text,false));
+
+  const antiguedad=daysBetween(pendientes[0].date,currentDate);
+  const n=pendientes.length;
+  setStatus(n+(n===1?' pendiente traído':' pendientes traídos')+(antiguedad>1?' · el más antiguo lleva '+antiguedad+' días':''),true);
 }
 
 /* Racha: días consecutivos con entrada, terminando hoy o ayer */
